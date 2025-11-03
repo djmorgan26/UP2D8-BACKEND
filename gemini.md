@@ -9,9 +9,9 @@ The project is a FastAPI backend service for the UP2D8 application. It serves as
 ## 2. Key Technologies
 
 - **Backend:** Python, FastAPI
-- **Database:** Not specified, but `pymongo` is in the requirements, so likely MongoDB.
+- **Database:** MongoDB (local and Azure Hosted CosmosDB Cluster for MongoDB)
 - **Authentication:** Azure Managed Identity and `DefaultAzureCredential` for local development.
-- **Secrets Management:** Azure Key Vault. No secrets are stored in the repository.
+- **Secrets Management:** Azure Key Vault `shared/key_vault_client.py`.
 - **Chat:** Google Gemini API.
 
 ## 3. Core Functionality (API Endpoints)
@@ -32,8 +32,8 @@ The project is a FastAPI backend service for the UP2D8 application. It serves as
 
 1.  **Prerequisites:** Python 3.9+, Pip, venv, Azure CLI.
 2.  **Authentication:** Log in to Azure CLI with `az login`.
-3.  **Configuration:** Create a `.env` file with the `KEY_VAULT_URI`.
-4.  **Dependencies:** Install dependencies from `requirements.txt` (FastAPI, Uvicorn, Pymongo, google-generativeai, azure-identity, azure-keyvault-secrets, python-dotenv).
+3.  **Configuration:** Create a `.env` file with the `KEY_VAULT_URI` and `GEMINI_API_KEY`.
+4.  **Dependencies:** Install dependencies from `requirements.txt` and use venv for local dev.
 5.  **Run:** `uvicorn main:app --reload`.
 
 ## 5. Non-Functional Requirements

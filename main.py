@@ -7,6 +7,8 @@ from api.analytics import router as analytics_router
 from api.chat import router as chat_router
 from api.feedback import router as feedback_router
 from api.users import router as users_router
+from api.articles import router as articles_router
+from api.rss_feeds import router as rss_feeds_router
 
 from dependencies import initialize_secrets, get_db_client
 
@@ -34,6 +36,8 @@ app.include_router(analytics_router)
 app.include_router(chat_router)
 app.include_router(feedback_router)
 app.include_router(users_router)
+app.include_router(articles_router)
+app.include_router(rss_feeds_router)
 
 
 

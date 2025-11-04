@@ -22,7 +22,7 @@ async def chat(request: ChatRequest):
     try:
         model = genai.GenerativeModel('gemini-pro')
         response = model.generate_content(request.prompt)
-        return {"text": response.text}
+        return {"text": response.text, "sources": []}
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Gemini API error: {e}")
 

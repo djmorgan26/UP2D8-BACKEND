@@ -56,10 +56,26 @@ async def update_user(user_id: str, user_update: UserUpdate, db=Depends(get_db_c
 
     result = users_collection.update_one(
         {"user_id": user_id},
-        {"$set": update_fields}
+        {"$set": update_fields, "$currentDate": {"updated_at": True}}
     )
 
     if result.matched_count == 0:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found.")
 
     return {"message": "Preferences updated."}
+
+@router.get("/api/users/{user_id}", status_code=status.HTTP_200_OK)
+async def get_user(user_id: str, db=Depends(get_db_client)):
+    users_collection = db.users
+    user = users_collection.find_one({"user_id": user_id}, {"_id": 0})
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found.")
+    return user
+
+@router.delete("/api/users/{user_id}", status_code=status.HTTP_200_OK)
+async def delete_user(user_id: str, db=Depends(get_db_client)):
+    users_collection = db.users
+    result = users_collection.delete_one({"user_id": user_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found.")
+    return {"message": "User deleted."}

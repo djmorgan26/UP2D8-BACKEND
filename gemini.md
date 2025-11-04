@@ -41,3 +41,10 @@ The project is a FastAPI backend service for the UP2D8 application. It serves as
 - **Security:** No hardcoded secrets. Uses Azure Key Vault.
 - **Performance:** p95 latency for chat should be < 3 seconds.
 - **Scalability:** The service should be stateless and horizontally scalable.
+
+## 6. Other Repositories
+
+This project spans 3 repositories (frontend, backend, function app). When doing work that involves integrating with the other repos of this greater project, refer to these handoff documents first.
+
+- **UP2D8-FUNCTION** The handoff document for this repo is `docs/handoff/function.md`.
+- **UP2D8-FRONTEND** The handoff document for this repo is `docs/handoff/frontend.md`.

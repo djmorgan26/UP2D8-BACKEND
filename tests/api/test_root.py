@@ -7,6 +7,7 @@ from main import app
 
 @patch("main.genai.configure")
 def test_read_root(mock_configure, test_client):
-    response = test_client.get("/")
+    client, _ = test_client # Unpack the fixture, _ for unused mock_db_client
+    response = client.get("/") # Use the unpacked client
     assert response.status_code == 200
     assert response.json() == {"Hello": "World"}

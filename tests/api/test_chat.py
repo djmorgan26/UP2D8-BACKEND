@@ -1,55 +1,102 @@
-import sys
-sys.path.append("/Users/davidmorgan/Documents/Repositories/UP2D8-BACKEND")
+import pytest
+from unittest.mock import MagicMock
 
-from unittest.mock import patch, MagicMock
+def test_chat_endpoint(test_client, mocker):
+    client, _ = test_client # Unpack the fixture, _ for unused mock_db_client
+    mock_generative_model = MagicMock()
+    mocker.patch('google.generativeai.GenerativeModel', return_value=mock_generative_model)
+    mock_generative_model.generate_content.return_value.text = "Mocked Gemini Response"
 
-# Mock the Gemini API
-genai_mock = MagicMock()
-with patch.dict('sys.modules', {'google.generativeai': genai_mock}):
-    from main import app
-
-@patch("main.genai.GenerativeModel")
-def test_chat(mock_generative_model, test_client):
-    mock_model = mock_generative_model.return_value
-    mock_model.generate_content.return_value.text = "This is a mocked response."
-
-    response = test_client.post("/api/chat", json={"prompt": "Hello"})
+    response = client.post("/api/chat", json={"prompt": "Hello Gemini"}) # Use the unpacked client
     assert response.status_code == 200
-    assert response.json()["text"] == "This is a mocked response."
+    assert response.json()["text"] == "Mocked Gemini Response"
+    mock_generative_model.generate_content.assert_called_once_with("Hello Gemini")
 
-def test_get_sessions(test_client):
-    # First, create a user
-    response = test_client.post("/api/users", json={"email": "test_sessions@example.com", "topics": ["testing"]})
+def test_create_session(test_client, mocker):
+    client, mock_db_client = test_client # Unpack the fixture
+    mock_sessions_collection = MagicMock()
+    mock_db_client.sessions = mock_sessions_collection # Configure the mock db client
+
+    response = client.post("/api/sessions", json={"user_id": "test_user", "title": "Test Session"})
     assert response.status_code == 200
-    user_id = response.json()["user_id"]
+    assert "session_id" in response.json()
+    mock_sessions_collection.insert_one.assert_called_once()
+    inserted_session = mock_sessions_collection.insert_one.call_args[0][0]
+    assert inserted_session["user_id"] == "test_user"
+    assert inserted_session["title"] == "Test Session"
+    assert "created_at" in inserted_session
+    assert inserted_session["messages"] == []
 
-    # Create a session
-    response = test_client.post(f"/api/sessions", json={"user_id": user_id, "title": "Test Session"})
+def test_get_sessions_for_user(test_client, mocker):
+    client, mock_db_client = test_client # Unpack the fixture
+    mock_sessions_collection = MagicMock()
+    mock_db_client.sessions = mock_sessions_collection # Configure the mock db client
+    mock_sessions_collection.find.return_value = [
+        {"session_id": "session1", "user_id": "user1", "title": "Session 1", "created_at": "2023-01-01T00:00:00Z"},
+        {"session_id": "session2", "user_id": "user1", "title": "Session 2", "created_at": "2023-01-02T00:00:00Z"}
+    ]
+
+    response = client.get("/api/users/user1/sessions")
     assert response.status_code == 200
-    session_id = response.json()["session_id"]
+    assert len(response.json()) == 2
+    assert response.json()[0]["session_id"] == "session1"
+    mock_sessions_collection.find.assert_called_once_with({"user_id": "user1"}, {"_id": 0})
 
-    # Get sessions for the user
-    response = test_client.get(f"/api/users/{user_id}/sessions")
+def test_send_message_to_session(test_client, mocker):
+    client, mock_db_client = test_client # Unpack the fixture
+    mock_sessions_collection = MagicMock()
+    mock_db_client.sessions = mock_sessions_collection # Configure the mock db client
+    mock_sessions_collection.update_one.return_value.matched_count = 1
+
+    session_id = "test_session_id"
+    response = client.post(f"/api/sessions/{session_id}/messages", json={"content": "Hello from test"})
     assert response.status_code == 200
-    assert len(response.json()) == 1
-    assert response.json()[0]["session_id"] == session_id
+    assert response.json()["message"] == "Message sent."
+    mock_sessions_collection.update_one.assert_called_once()
+    update_filter = mock_sessions_collection.update_one.call_args[0][0]
+    update_payload = mock_sessions_collection.update_one.call_args[0][1]
+    assert update_filter["session_id"] == session_id
+    assert "$push" in update_payload
+    assert update_payload["$push"]["messages"]["role"] == "user"
+    assert update_payload["$push"]["messages"]["content"] == "Hello from test"
 
-@patch("main.genai.GenerativeModel")
-def test_get_messages(mock_generative_model, test_client):
-    mock_model = mock_generative_model.return_value
-    mock_model.generate_content.return_value.text = "This is a mocked response."
+def test_send_message_session_not_found(test_client, mocker):
+    client, mock_db_client = test_client # Unpack the fixture
+    mock_sessions_collection = MagicMock()
+    mock_db_client.sessions = mock_sessions_collection # Configure the mock db client
+    mock_sessions_collection.update_one.return_value.matched_count = 0
 
-    # First, create a user and a session
-    response = test_client.post("/api/users", json={"email": "test_messages@example.com", "topics": ["testing"]})
-    user_id = response.json()["user_id"]
-    response = test_client.post(f"/api/sessions", json={"user_id": user_id, "title": "Test Session"})
-    session_id = response.json()["session_id"]
+    session_id = "non_existent_session"
+    response = client.post(f"/api/sessions/{session_id}/messages", json={"content": "Hello"})
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Session not found."
 
-    # Post a message
-    response = test_client.post(f"/api/sessions/{session_id}/messages", json={"content": "Hello"})
+def test_get_messages_from_session(test_client, mocker):
+    client, mock_db_client = test_client # Unpack the fixture
+    mock_sessions_collection = MagicMock()
+    mock_db_client.sessions = mock_sessions_collection # Configure the mock db client
+    mock_sessions_collection.find_one.return_value = {
+        "session_id": "session1",
+        "messages": [
+            {"role": "user", "content": "Hi"},
+            {"role": "model", "content": "Hello there"}
+        ]
+    }
+
+    session_id = "session1"
+    response = client.get(f"/api/sessions/{session_id}/messages")
     assert response.status_code == 200
+    assert len(response.json()) == 2
+    assert response.json()[0]["content"] == "Hi"
+    mock_sessions_collection.find_one.assert_called_once_with({"session_id": session_id}, {"_id": 0, "messages": 1})
 
-    # Get messages for the session
-    response = test_client.get(f"/api/sessions/{session_id}/messages")
-    assert response.status_code == 200
-    assert len(response.json()) == 2 # User and model message
+def test_get_messages_session_not_found(test_client, mocker):
+    client, mock_db_client = test_client # Unpack the fixture
+    mock_sessions_collection = MagicMock()
+    mock_db_client.sessions = mock_sessions_collection # Configure the mock db client
+    mock_sessions_collection.find_one.return_value = None
+
+    session_id = "non_existent_session"
+    response = client.get(f"/api/sessions/{session_id}/messages")
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Session not found."
